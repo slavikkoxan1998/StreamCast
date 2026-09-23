@@ -47,6 +47,7 @@ source venv/bin/activate
 
 # 3. Install dependencies
 pip install -r requirements.txt
+# For Linux (production): pip install gunicorn
 
 # 4. Set your password (otherwise it defaults to "changeme")
 #   Windows PowerShell:  $env:STREAMCAST_PASSWORD="my-secret"
@@ -212,7 +213,8 @@ All settings are environment variables (see `.env.example`):
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `STREAMCAST_PASSWORD` | `changeme` | Login password |
+| `STREAMCAST_PASSWORD` | `changeme` | Login password (changed on first start) |
+| `STREAMCAST_REQUIRE_LOGIN` | `1` | Enable authorization (0 = disabled) |
 | `STREAMCAST_SECRET` | dev value | Session cookie signing key |
 | `STREAMCAST_RTMP_BASE` | YouTube live2 | RTMP ingest base URL |
 | `STREAMCAST_STORAGE` | `./storage` | Where uploads, encoded files, and the DB live |

@@ -1,6 +1,47 @@
 {% extends "base.html" %}
 {% block title %}{{ 'New stream' if not stream else 'Edit ' + stream.name }} — StreamCast{% endblock %}
 {% block body %}
+<style>
+  .type-picker { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width: 560px) { .type-picker { grid-template-columns:1fr; } }
+  .type-option {
+    display:flex; flex-direction:column; gap:4px;
+    border:1px solid var(--border-strong); border-radius:10px;
+    padding:12px 14px; cursor:pointer;
+  }
+  .type-option:has(input:checked) {
+    border-color: var(--accent, #007bff);
+    box-shadow: 0 0 0 1px var(--accent, #007bff) inset;
+  }
+  .type-option input { margin:0 6px 0 0; vertical-align:-2px; }
+  .type-title { font-weight:600; }
+  .type-desc { font-size:12px; color:var(--muted, #888); }
+  .res-picker { display:flex; gap:8px; flex-wrap:wrap; }
+  .res-option {
+    border:1px solid var(--border-strong); border-radius:999px;
+    padding:8px 14px; font-size:13px; font-weight:600; color:var(--text-2, #444);
+  }
+  .res-option.active {
+    border-color: var(--accent, #007bff); color: var(--accent, #007bff);
+    background: rgba(109,135,255,.10);
+    box-shadow: 0 0 0 1px var(--accent, #007bff) inset;
+  }
+  .res-br { color: var(--muted, #888); font-weight:500; }
+  .mode-picker { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  @media (max-width: 640px) { .mode-picker { grid-template-columns:1fr; } }
+  .mode-option {
+    display:flex; flex-direction:column; gap:4px;
+    border:1px solid var(--border-strong); border-radius:10px;
+    padding:12px 14px; cursor:pointer;
+  }
+  .mode-option:has(input:checked) {
+    border-color: var(--accent, #007bff);
+    box-shadow: 0 0 0 1px var(--accent, #007bff) inset;
+  }
+  .mode-option input { margin:0 6px 0 0; vertical-align:-2px; }
+  .mode-name { font-weight:600; }
+  .mode-spec { font-size:12px; color:var(--muted, #888); }
+</style>
 <div class="page-head">
   <div>
     <h1>{{ 'New stream' if not stream else 'Edit stream' }}</h1>
@@ -9,11 +50,53 @@
   <a href="{{ url_for('dashboard') if not stream else url_for('stream_detail', stream_id=stream.id) }}" class="btn">Cancel</a>
 </div>
 
-<div class="card" style="max-width:620px">
+<div class="card">
   <form method="post" action="{{ url_for('stream_create') if not stream else url_for('stream_edit', stream_id=stream.id) }}">
     <div class="field">
       <label for="name">Stream name</label>
       <input type="text" id="name" name="name" value="{{ stream.name if stream else '' }}" placeholder="e.g. Lo-fi radio 24/7" required>
+    </div>
+    {% if not stream %}
+    <div class="field">
+      <label>Stream type</label>
+      <div class="type-picker">
+        <label class="type-option">
+          <span class="type-title"><input type="radio" name="stream_type" value="video" checked>🎬 Video stream</span>
+          <span class="type-desc">Random or sequential playback of video files</span>
+        </label>
+        <label class="type-option">
+          <span class="type-title"><input type="radio" name="stream_type" value="music">🎵 Music stream</span>
+          <span class="type-desc">Loop one video as the visual, play an audio playlist over it</span>
+        </label>
+      </div>
+      <p class="hint">Video: uploaded videos play back-to-back in queue order. Music: one video file loops as the background while audio tracks play from your list (random or sequential). The type can't be changed later.</p>
+    </div>
+    {% else %}
+    <div class="field">
+      <label>Stream type</label>
+      <p class="hint" style="margin:0">
+        {% if stream.stream_type == 'music' %}🎵 Music stream — one looping video with an audio playlist{% else %}🎬 Video stream{% endif %}
+        <span class="muted">(can't be changed)</span>
+      </p>
+    </div>
+    {% endif %}
+    <div class="field">
+      <label>Quality mode</label>
+      <div class="mode-picker">
+        <label class="mode-option">
+          <span class="mode-name"><input type="radio" name="quality_mode" value="quality" {{ 'checked' if current_mode == 'quality' }}>💎 Max quality</span>
+          <span class="mode-spec">1080p · 6000 kbps · AAC 192k · slow encode</span>
+        </label>
+        <label class="mode-option">
+          <span class="mode-name"><input type="radio" name="quality_mode" value="balanced" {{ 'checked' if current_mode == 'balanced' }}>⚖️ Balanced</span>
+          <span class="mode-spec">1080p · 4500 kbps · AAC 128k</span>
+        </label>
+        <label class="mode-option">
+          <span class="mode-name"><input type="radio" name="quality_mode" value="performance" {{ 'checked' if current_mode == 'performance' }}>⚡ Max performance</span>
+          <span class="mode-spec">720p · 2500 kbps · fastest encode</span>
+        </label>
+      </div>
+      <p class="hint">All modes run at 30 fps.{% if stream %} Switching re-encodes the whole queue in the background — files keep playing in the old quality until each new copy is ready.{% endif %}</p>
     </div>
     <div class="field">
       <label for="rtmp_key">YouTube stream key</label>

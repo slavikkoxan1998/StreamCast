@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ stream.name }} — StreamCast{% endblock %}
 {% block body %}
-<div class="page-head">
+<div class="page-head stream-head">
   <div>
     <div class="row" style="margin-bottom:8px">
       <a href="{{ url_for('dashboard') }}" class="muted">← Streams</a>
@@ -9,24 +9,33 @@
     <h1>{{ stream.name }}</h1>
     <div class="row" style="margin-top:8px">
       <span id="livePill" class="pill {{ 'pill-live' if status.live else 'pill-off' }}">
+
+
         <span class="pdot"></span><span id="liveText">{{ 'LIVE' if status.live else 'OFFLINE' }}</span>
       </span>
+      <span id="liveTimer" class="muted" hidden style="font-size:12.5px; font-variant-numeric:tabular-nums;"></span>
       {% if stream.youtube_url %}<a href="{{ stream.youtube_url }}" target="_blank">Watch on YouTube ↗</a>{% endif %}
     </div>
   </div>
-  <div class="row">
-    <a href="{{ url_for('stream_edit', stream_id=stream.id) }}" class="btn">Edit</a>
+  <div class="page-actions">
+    {% if can_manage %}
+    <div class="pa-row">
+      <a href="{{ url_for('stream_edit', stream_id=stream.id) }}" class="btn">Edit</a>
+      {% if status.live %}
+        <form method="post" action="{{ url_for('stream_stop', stream_id=stream.id) }}">
+          <button class="btn btn-danger">■ Stop</button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('stream_start', stream_id=stream.id) }}">
+          <button class="btn btn-live">● Go live</button>
+        </form>
+      {% endif %}
+    </div>
     {% if status.live %}
-      <form method="post" action="{{ url_for('stream_apply', stream_id=stream.id) }}">
-        <button class="btn" title="Rebuild the broadcast from the current queue right now">↻ Apply queue now</button>
-      </form>
-      <form method="post" action="{{ url_for('stream_stop', stream_id=stream.id) }}">
-        <button class="btn btn-danger">■ Stop</button>
-      </form>
-    {% else %}
-      <form method="post" action="{{ url_for('stream_start', stream_id=stream.id) }}">
-        <button class="btn btn-live">● Go live</button>
-      </form>
+    <form class="pa-apply" method="post" action="{{ url_for('stream_apply', stream_id=stream.id) }}">
+      <button class="btn" title="Rebuild the broadcast from the current queue right now">↻ Apply queue now</button>
+    </form>
+    {% endif %}
     {% endif %}
   </div>
 </div>
@@ -36,53 +45,171 @@
 {% endif %}
 
 <!-- Upload -->
+{% if can_manage %}
 <div class="card">
-  <h2>Add videos</h2>
+  <h2>Add {{ 'audio' if stream.stream_type == 'music' else 'videos' }}</h2>
   <form id="uploadForm" method="post" action="{{ url_for('upload', stream_id=stream.id) }}" enctype="multipart/form-data">
     <div class="dropzone" id="dropzone">
+      {% if stream.stream_type == 'music' %}
+      <div>Drag &amp; drop audio files here, or <b>click to browse</b></div>
+      <div class="hint" style="margin-top:6px">mp3, wav, flac, ogg, m4a — tracks are normalized before streaming. Upload one video file too and set it as the loop background below.</div>
+      <input type="file" id="fileInput" name="video" accept="audio/*,video/*" multiple hidden>
+      {% else %}
       <div>Drag &amp; drop videos here, or <b>click to browse</b></div>
       <div class="hint" style="margin-top:6px">mp4, mov, mkv, webm — 60fps files are blocked. Files are normalized before streaming.</div>
       <input type="file" id="fileInput" name="video" accept="video/*" multiple hidden>
+      {% endif %}
     </div>
     <div id="selectedInfo" class="hint" style="margin-top:10px"></div>
+    <div id="uploadProgress" style="display:none; margin-top:10px;">
+      <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+        <span id="uploadStatus">Uploading...</span>
+        <span id="uploadPercent">0%</span>
+      </div>
+      <div style="background:var(--border); height:6px; border-radius:3px; overflow:hidden;">
+        <div id="uploadBar" style="background:var(--accent, #007bff); width:0%; height:100%; transition: width 0.2s;"></div>
+      </div>
+    </div>
+    
+    <div id="uploadList" style="margin-top:15px; display:none;">
+      <div style="font-size:13px; font-weight:bold; margin-bottom:8px; color:var(--muted, #666);">Uploading files:</div>
+      <div id="uploadItems" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
     <button type="submit" class="btn btn-primary" style="margin-top:14px" id="uploadBtn" disabled>Upload</button>
   </form>
 </div>
+{% endif %}
 
 <!-- Queue -->
 <div class="card">
-  <div class="row" style="margin-bottom:16px">
-    <h2 style="margin:0">Video queue</h2>
-    <span class="spacer"></span>
-    <span id="queueHint" class="muted" style="font-size:13px">Drag to reorder — this is the play order</span>
+  <div class="qhead">
+    <h2>{{ 'Audio queue' if stream.stream_type == 'music' else 'Video queue' }}</h2>
+    <span class="qhead-side">
+      {% if can_manage %}
+      <span style="font-weight:500;">Random Play</span>
+      <label class="switch">
+        <input type="checkbox" id="shuffleToggle" {{ 'checked' if stream.shuffle else '' }}>
+        <span class="slider round"></span>
+      </label>
+      {% endif %}
+    </span>
   </div>
+  {% if stream.stream_type == 'music' %}
+  <p class="hint qnote">
+    One video file loops as the visual while audio tracks play over it.
+    {% if not stream.loop_video_id %}<b>No loop video selected yet</b> — upload a video file and pick it below.{% endif %}
+  </p>
+  <div class="qvol-row" style="gap:14px; {{ '' if can_manage else 'display:none;' }}">
+    <div id="mixVolWrap" style="display:flex; align-items:center; gap:6px; transition:opacity .2s; {{ '' if stream.mix_video_audio else 'opacity:.4;' }}">
+      <span style="font-weight:500;">Video volume</span>
+      <input type="range" id="mixVol" min="0" max="200" step="5" value="{{ ((stream.video_volume or 0.5) * 100) | round | int }}" style="width:110px;" {{ '' if stream.mix_video_audio else 'disabled' }}>
+      <span id="mixVolVal">{{ ((stream.video_volume or 0.5) * 100) | round | int }}%</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span style="font-weight:500;">Music volume</span>
+      <input type="range" id="musicVol" min="0" max="200" step="5" value="{{ ((stream.music_volume if stream.music_volume is not none else 1.0) * 100) | round | int }}" style="width:110px;">
+      <span id="musicVolVal">{{ ((stream.music_volume if stream.music_volume is not none else 1.0) * 100) | round | int }}%</span>
+    </div>
+  </div>
+  <div class="qtot-row">
+    {% if can_manage %}
+    <div style="display:flex; align-items:center; gap:8px; font-weight:500; color:var(--muted, #666);">
+      Video sound
+      <label class="switch" style="vertical-align:middle">
+        <input type="checkbox" id="mixToggle" {{ 'checked' if stream.mix_video_audio else '' }}>
+        <span class="slider round"></span>
+      </label>
+    </div>
+    {% endif %}
+    <div style="display:flex; align-items:center; gap:8px 14px;">
+      {% if resolution %}<span class="qres {{ 'qres-max' if stream.quality_mode == 'quality' }}" title="{{ 'Max quality mode' if stream.quality_mode == 'quality' else 'Stream resolution' }}">{% if stream.quality_mode == 'quality' %}✦ {% endif %}{{ resolution }}</span>{% endif %}
+      <span id="queueTotals" class="muted" style="font-size:13px; font-variant-numeric:tabular-nums;">{{ totals_label }}</span>
+    </div>
+  </div>
+  {% else %}
+  <div class="qvol-row" style="{{ '' if can_manage else 'display:none;' }}">
+    <span style="display:flex; align-items:center; gap:6px;">
+      <span style="font-weight:500;">Audio volume</span>
+      <input type="range" id="streamVol" min="0" max="200" step="5" value="{{ ((stream.stream_volume if stream.stream_volume is not none else 1.0) * 100) | round | int }}" style="width:130px;">
+      <span id="streamVolVal">{{ ((stream.stream_volume if stream.stream_volume is not none else 1.0) * 100) | round | int }}%</span>
+    </span>
+  </div>
+  <div class="qtot-row qtot-right">
+    {% if resolution %}<span class="qres {{ 'qres-max' if stream.quality_mode == 'quality' }}" title="{{ 'Max quality mode' if stream.quality_mode == 'quality' else 'Stream resolution' }}">{% if stream.quality_mode == 'quality' %}✦ {% endif %}{{ resolution }}</span>{% endif %}
+    <span id="queueTotals" class="muted" style="font-size:13px; font-variant-numeric:tabular-nums;">{{ totals_label }}</span>
+  </div>
+  {% endif %}
+  <span id="settingsError" style="display:none; color:#d9534f; font-size:12px; margin:-4px 0 12px;"></span>
   {% if status.live %}
-  <p class="hint" id="liveEditHint" style="margin:-6px 0 16px">
+  <p class="hint" id="liveEditHint" style="margin:0 0 16px">
     Stream is live. Changes to the queue apply automatically at the next block, or hit <b>Apply queue now</b> above to switch immediately.
   </p>
   {% endif %}
   {% if videos %}
+  <span id="queueHint" class="muted qhint">Drag rows to reorder — this is the play order</span>
+  {% if u_role == 'admin' %}
+  <div id="batchBar" class="batch-bar" hidden>
+    <span id="batchCount"></span>
+    <button type="button" class="btn btn-sm btn-danger" id="batchDeleteBtn">Delete selected</button>
+  </div>
+  {% endif %}
   <ul class="queue" id="queue" data-stream="{{ stream.id }}">
     {% for v in videos %}
-    <li class="qitem" draggable="true" data-id="{{ v.id }}">
-      <span class="qhandle">⠿</span>
-      <div style="flex:1; min-width:0">
-        <span class="qname" title="{{ v.orig_name }}">{{ v.orig_name }}</span>
-        <div class="nowbar" data-nowbar hidden><div class="nowbar-fill" data-nowfill></div></div>
+    <li class="qitem" data-id="{{ v.id }}">
+
+      <span class="qhandle" title="Drag to reorder">⠿</span>
+      <div class="qrow-top">
+        {% if u_role == 'admin' %}
+        <input type="checkbox" class="qselect" data-id="{{ v.id }}" aria-label="Select file for deletion">
+        {% endif %}
+        <div class="qmain">
+          <span class="qname" title="{{ v.orig_name }}">{{ v.display_name }}</span>
+          <div class="nowbar" data-nowbar hidden><div class="nowbar-fill" data-nowfill></div></div>
+          <div class="qprogress" data-qprogress hidden style="height:4px; background:var(--border); border-radius:2px; margin-top:4px; overflow:hidden;"><div class="qprogress-fill" data-qprogress-fill style="height:100%; background:var(--accent, #007bff); width:0%; transition: width 0.3s;"></div></div>
+        </div>
       </div>
+      <div class="qmeta">
       <span class="nowtag" data-nowtag hidden>● ON AIR</span>
+      {% if can_manage and v.status == 'completed' and v.encoded_name %}
+      <button type="button" class="qplay" data-video="{{ v.id }}" data-name="{{ v.orig_name }}" title="Preview">▶</button>
+      {% endif %}
+      {% if stream.stream_type == 'music' and v.kind == 'video' %}
+        {% if stream.loop_video_id == v.id %}
+        <span class="pill pill-off" style="font-size:11px; white-space:nowrap">◐ LOOP BG</span>
+        {% else %}
+        <form method="post" action="{{ url_for('video_set_loop', video_id=v.id) }}">
+          <button class="btn btn-sm" title="Use this video as the looping background">◐ Loop BG</button>
+        </form>
+        {% endif %}
+      {% endif %}
+      {% if v.res_label %}<span class="qres" data-res title="Source resolution">{{ v.res_label }}</span>{% else %}<span class="qres" data-res title="Source resolution" hidden></span>{% endif %}
       <span class="qdur" data-dur>{{ '%d:%02d'|format((v.duration or 0)//60, (v.duration or 0)%60) if v.duration else '' }}</span>
+      {% if v.size_label %}<span class="qsize" data-size title="Encoded file size">{{ v.size_label }}</span>{% else %}<span class="qsize" data-size title="Encoded file size" hidden></span>{% endif %}
+      {% if v.status != 'completed' %}
       <span class="status-tag st-{{ v.status }}" data-status title="{{ v.error_msg }}">{{ v.status.replace('_',' ') }}</span>
+      {% endif %}
       <form method="post" action="{{ url_for('video_delete', video_id=v.id) }}" onsubmit="return confirm('Delete this video?')">
-        <button class="btn btn-sm btn-danger">✕</button>
+        {% if u_role == 'admin' %}<button class="btn btn-sm btn-danger">✕</button>{% endif %}
       </form>
+      </div>
     </li>
     {% endfor %}
   </ul>
   {% else %}
-  <div class="empty" style="padding:32px">No videos yet. Upload some above to build your 24/7 loop.</div>
+  <div class="empty" style="padding:32px">{% if stream.stream_type == 'music' %}No audio yet. Upload audio tracks to build your 24/7 music loop.{% else %}No videos yet. Upload some above to build your 24/7 loop.{% endif %}</div>
   {% endif %}
 </div>
+
+{% if can_manage %}
+<dialog id="previewDlg" class="preview-dlg">
+  <video id="previewPlayer" controls></video>
+  <div class="preview-foot">
+    <span id="previewName" class="muted"></span>
+    <button type="button" class="btn btn-sm" id="previewClose">Close</button>
+  </div>
+</dialog>
+{% endif %}
 
 <!-- Schedule -->
 <div class="card">
@@ -100,51 +227,479 @@
 
 {% block scripts %}
 <script>
+
 const streamId = {{ stream.id }};
+const canManage = {{ 'true' if can_manage else 'false' }};
+// Live session timer (HH:MM:SS), ticked client-side from the polled uptime.
+let liveNow = false;
+let liveBase = null;  // client-side epoch seconds the session started
+
+function fmtHMS(total) {
+  total = Math.max(0, Math.floor(total));
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+setInterval(() => {
+  const el = document.getElementById('liveTimer');
+  if (!el) return;
+  if (liveNow && liveBase !== null) {
+    el.hidden = false;
+    el.textContent = fmtHMS(Date.now() / 1000 - liveBase);
+  } else {
+    el.hidden = true;
+  }
+}, 1000);
+// Initial control states (shuffle, volumes, mix) are rendered server-side —
+// no async init, so nothing flickers or resets when the page reloads.
+
+
+
+
+
+
+
+
+
+
 
 // --- Upload: dropzone + file picker ---
 const dz = document.getElementById('dropzone');
 const input = document.getElementById('fileInput');
 const info = document.getElementById('selectedInfo');
 const uploadBtn = document.getElementById('uploadBtn');
+const uploadForm = document.getElementById('uploadForm');
+const uploadList = document.getElementById('uploadList');
+const uploadItems = document.getElementById('uploadItems');
 
-dz.addEventListener('click', () => input.click());
-['dragover','dragenter'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('hover'); }));
-['dragleave','drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('hover'); }));
-dz.addEventListener('drop', ev => { input.files = ev.dataTransfer.files; refreshSelected(); });
-input.addEventListener('change', refreshSelected);
-function refreshSelected() {
-  const n = input.files.length;
-  info.textContent = n ? `${n} file(s) selected` : '';
-  uploadBtn.disabled = n === 0;
+if (dz && input) {
+  dz.onclick = () => input.click();
+  ['dragover','dragenter'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.add('hover'); }));
+  ['dragleave','drop'].forEach(e => dz.addEventListener(e, ev => { ev.preventDefault(); dz.classList.remove('hover'); }));
+  dz.ondrop = (ev) => { 
+    ev.preventDefault(); 
+    dz.classList.remove('hover');
+    window.pendingUploadFiles = Array.from(ev.dataTransfer.files);
+    info.textContent = `${window.pendingUploadFiles.length} file(s) selected`;
+    uploadBtn.disabled = window.pendingUploadFiles.length === 0;
+  };
+  input.onchange = () => {
+    window.pendingUploadFiles = Array.from(input.files);
+    info.textContent = window.pendingUploadFiles.length ? `${window.pendingUploadFiles.length} file(s) selected` : '';
+    uploadBtn.disabled = window.pendingUploadFiles.length === 0;
+  };
 }
 
-// --- Drag to reorder queue ---
+let activeUploads = new Map();
+
+if (uploadForm) {
+  uploadForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const files = window.pendingUploadFiles || Array.from(input.files);
+    if (files.length === 0) return;
+
+    uploadBtn.disabled = false; 
+    uploadBtn.textContent = 'Cancel All';
+    uploadBtn.className = 'btn'; 
+    uploadBtn.style.backgroundColor = '#dc3545';
+    uploadBtn.style.borderColor = '#dc3545';
+    uploadBtn.style.color = '#fff';
+    
+    const originalOnsubmit = uploadForm.onsubmit;
+    uploadForm.onsubmit = (ev) => {
+      ev.preventDefault();
+      activeUploads.forEach(xhr => xhr.abort());
+      activeUploads.clear();
+      
+      uploadBtn.textContent = 'Upload';
+      uploadBtn.className = 'btn btn-primary';
+      uploadBtn.style.backgroundColor = '';
+      uploadBtn.style.borderColor = '';
+      uploadBtn.style.color = '';
+      uploadBtn.disabled = files.length === 0;
+      
+      window.pendingUploadFiles = [];
+      if (input) input.value = '';
+      info.textContent = '';
+      uploadBtn.disabled = true;
+      
+      uploadList.style.display = 'none';
+      uploadItems.innerHTML = '';
+      uploadForm.onsubmit = originalOnsubmit;
+    };
+
+    uploadList.style.display = 'block';
+    uploadItems.innerHTML = '';
+
+    const uploadPromises = files.map(async (file, index) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; align-items:center; font-size:13px; padding:8px; background:var(--surface-2); border-radius:4px; border:1px solid var(--border);';
+      row.innerHTML = `
+        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right:10px;">${file.name}</span>
+        <div style="flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; margin-right:10px;">
+          <div class="u-fill" style="height:100%; background:var(--accent, #007bff); width:0%; transition:width 0.2s;"></div>
+        </div>
+        <span class="u-percent" style="width:45px; text-align:right; font-size:11px; display:inline-block; margin-right:10px;">0%</span>
+        <button type="button" class="btn-cancel" style="background:none; border:none; color:red; cursor:pointer; font-weight:bold; padding:0; width:20px; text-align:right;">✕</button>
+      `;
+      uploadItems.appendChild(row);
+
+      const pFill = row.querySelector('.u-fill');
+      const pText = row.querySelector('.u-percent');
+      const cancelBtn = row.querySelector('.btn-cancel');
+
+      const formData = new FormData();
+      formData.append('video', file);
+
+      return new Promise((resolve) => {
+        const xhr = new XMLHttpRequest();
+        const fileKey = file.name + '_' + index;
+        activeUploads.set(fileKey, xhr);
+        
+        cancelBtn.onclick = (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          xhr.abort();
+          row.style.opacity = '0.5';
+          pText.textContent = 'Canceled';
+          // visibility (not display:none) keeps the row layout stable after cancel
+          cancelBtn.style.visibility = 'hidden';
+          activeUploads.delete(fileKey);
+          resolve();
+        };
+
+        xhr.open('POST', uploadForm.action);
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) {
+            const p = Math.round((ev.loaded / ev.total) * 100);
+            pFill.style.width = p + '%';
+            pText.textContent = p + '%';
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            row.style.opacity = '0.5';
+            pText.textContent = 'OK';
+          } else {
+            row.style.color = 'red';
+            pText.textContent = 'Err';
+          }
+          cancelBtn.style.visibility = 'hidden';
+          activeUploads.delete(fileKey);
+          resolve();
+        };
+        xhr.onerror = () => {
+          row.style.color = 'red';
+          pText.textContent = 'Err';
+          cancelBtn.style.visibility = 'hidden';
+          activeUploads.delete(fileKey);
+          resolve();
+        };
+        xhr.send(formData);
+      });
+    });
+
+    await Promise.all(uploadPromises);
+    
+    uploadBtn.textContent = 'Upload';
+    uploadBtn.className = 'btn btn-primary';
+    uploadBtn.style.backgroundColor = '';
+    uploadBtn.style.borderColor = '';
+    uploadBtn.style.color = '';
+    uploadBtn.disabled = false;
+    uploadForm.onsubmit = originalOnsubmit;
+    setTimeout(() => window.location.reload(), 1000);
+  };
+}
+
+
+// --- Visible feedback when a settings save fails (otherwise silent) ---
+function showSettingsError(msg) {
+  const el = document.getElementById('settingsError');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'inline';
+  clearTimeout(showSettingsError._t);
+  showSettingsError._t = setTimeout(() => { el.style.display = 'none'; }, 6000);
+}
+
+// --- Shuffle Toggle Handler ---
+const shuffleToggle = document.getElementById('shuffleToggle');
+if (shuffleToggle) {
+  shuffleToggle.onchange = async () => {
+    const enabled = shuffleToggle.checked;
+    try {
+      const res = await fetch(`/api/stream_shuffle/${streamId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        body: JSON.stringify({ enabled })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+    } catch (e) {
+      console.error('Failed to update shuffle status', e);
+      shuffleToggle.checked = !enabled;
+      showSettingsError('Failed to save — is the server running the latest code?');
+    }
+  };
+}
+
+// --- Video sound toggle: enables/disables the Video volume slider ---
+const mixToggle = document.getElementById('mixToggle');
+const mixVol = document.getElementById('mixVol');
+const mixVolVal = document.getElementById('mixVolVal');
+
+async function sendMixSettings() {
+  const body = { enabled: mixToggle.checked };
+  if (mixVol) body.volume = +mixVol.value;
+  try {
+    const res = await fetch(`/api/stream_mix/${streamId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  } catch (e) {
+    console.error('Failed to update video sound settings', e);
+    showSettingsError('Failed to save — is the server running the latest code?');
+  }
+}
+
+if (mixToggle) {
+  const mixVolWrap = document.getElementById('mixVolWrap');
+  const applyMixState = () => {
+    if (mixVol) mixVol.disabled = !mixToggle.checked;
+    if (mixVolWrap) mixVolWrap.style.opacity = mixToggle.checked ? '1' : '.4';
+  };
+  applyMixState();  // sync on load in case the slider starts disabled
+  mixToggle.onchange = () => { applyMixState(); sendMixSettings(); };
+}
+if (mixVol && mixVolVal) {
+  mixVol.oninput = () => { mixVolVal.textContent = mixVol.value + '%'; };
+  mixVol.onchange = sendMixSettings;  // send once on release, not per tick
+}
+
+// --- Playback volume sliders (music playlist / video-stream audio) ---
+async function sendVolume(volume) {
+  try {
+    const res = await fetch(`/api/stream_volume/${streamId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+      body: JSON.stringify({ volume })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  } catch (e) {
+    console.error('Failed to update volume', e);
+    showSettingsError('Failed to save volume — restart the server so the new API is loaded');
+  }
+}
+
+const musicVol = document.getElementById('musicVol');
+const musicVolVal = document.getElementById('musicVolVal');
+if (musicVol && musicVolVal) {
+  musicVol.oninput = () => { musicVolVal.textContent = musicVol.value + '%'; };
+  musicVol.onchange = () => sendVolume(+musicVol.value);
+}
+
+const streamVol = document.getElementById('streamVol');
+const streamVolVal = document.getElementById('streamVolVal');
+if (streamVol && streamVolVal) {
+  streamVol.oninput = () => { streamVolVal.textContent = streamVol.value + '%'; };
+  streamVol.onchange = () => sendVolume(+streamVol.value);
+}
+// --- Reorder queue (manage rights required) ---
+// Desktop: grab the ⠿ grip and drag with the mouse.
+// Touch: long-press (~250ms) a row, then drag — HTML5 drag never fires on touch.
 const queue = document.getElementById('queue');
-if (queue) {
-  let dragEl = null;
-  queue.querySelectorAll('.qitem').forEach(item => {
-    item.addEventListener('dragstart', () => { dragEl = item; item.classList.add('dragging'); });
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-      queue.querySelectorAll('.qitem').forEach(i => i.classList.remove('drag-over'));
-      saveOrder();
-    });
-    item.addEventListener('dragover', e => {
-      e.preventDefault();
-      const after = e.clientY > item.getBoundingClientRect().top + item.offsetHeight / 2;
-      queue.querySelectorAll('.qitem').forEach(i => i.classList.remove('drag-over'));
-      item.classList.add('drag-over');
-      if (after) item.after(dragEl); else item.before(dragEl);
-    });
-  });
+if (queue && canManage) {
   function saveOrder() {
     const order = [...queue.querySelectorAll('.qitem')].map(i => +i.dataset.id);
     fetch('{{ url_for("api_reorder") }}', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
       body: JSON.stringify({ stream_id: streamId, order })
     });
   }
+  // Swap the dragged row with the one under the pointer when its midline is crossed.
+  function swapAt(item, x, y) {
+    const under = document.elementFromPoint(x, y);
+    const over = under && under.closest('.qitem');
+    if (!over || over === item) return false;
+    const r = over.getBoundingClientRect();
+    if (y > r.top + r.height / 2) over.after(item); else over.before(item);
+    return true;
+  }
+
+  // --- Mouse drag by the grip ---
+  let mouseDrag = null;
+  queue.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse') return;  // touch uses the long-press path
+    const handle = e.target.closest('.qhandle');
+    if (!handle) return;
+    e.preventDefault();  // no text selection while gripping
+    mouseDrag = { item: handle.closest('.qitem'), moved: false };
+  });
+  document.addEventListener('pointermove', e => {
+    if (!mouseDrag) return;
+    if (!mouseDrag.moved) {
+      mouseDrag.moved = true;
+      mouseDrag.item.classList.add('dragging');
+    }
+    swapAt(mouseDrag.item, e.clientX, e.clientY);
+  });
+  const endMouseDrag = () => {
+    if (!mouseDrag) return;
+    mouseDrag.item.classList.remove('dragging');
+    if (mouseDrag.moved) saveOrder();
+    mouseDrag = null;
+  };
+  document.addEventListener('pointerup', endMouseDrag);
+  document.addEventListener('pointercancel', endMouseDrag);
+
+  // --- Touch long-press drag ---
+  let touchDrag = null;
+  const ITEM_GAP = 10;  // .qitem margin-bottom
+  queue.addEventListener('touchstart', e => {
+    const item = e.target.closest('.qitem');
+    if (!item || e.touches.length !== 1) return;
+    touchDrag = {
+      item,
+      startX: e.touches[0].clientX,
+      startY: e.touches[0].clientY,
+      active: false,
+      timer: setTimeout(() => {
+        if (!touchDrag) return;
+        touchDrag.active = true;
+        touchDrag.item.classList.add('dragging');
+        touchDrag.item.style.transform = 'none';  // override the .dragging scale
+        if (navigator.vibrate) navigator.vibrate(15);
+      }, 250),
+    };
+  }, { passive: true });
+
+  queue.addEventListener('touchmove', e => {
+    if (!touchDrag) return;
+    const t = e.touches[0];
+    if (!touchDrag.active) {
+      // Finger drifted before the long-press fired → that's a scroll, not a drag.
+      if (Math.abs(t.clientY - touchDrag.startY) > 12 || Math.abs(t.clientX - touchDrag.startX) > 12) {
+        clearTimeout(touchDrag.timer);
+        touchDrag = null;
+      }
+      return;
+    }
+    e.preventDefault();  // stop the page from scrolling mid-drag
+    touchDrag.item.style.transform = `translateY(${t.clientY - touchDrag.startY}px)`;
+    const under = document.elementFromPoint(t.clientX, t.clientY);
+    const over = under && under.closest('.qitem');
+    if (over && over !== touchDrag.item) {
+      const r = over.getBoundingClientRect();
+      const h = r.height + ITEM_GAP;
+      if (t.clientY > r.top + r.height / 2) {
+        over.after(touchDrag.item);
+        touchDrag.startY += h;  // keep the follow-offset in sync with the swap
+      } else {
+        over.before(touchDrag.item);
+        touchDrag.startY -= h;
+      }
+    }
+  }, { passive: false });
+
+  const endTouchDrag = () => {
+    if (!touchDrag) return;
+    clearTimeout(touchDrag.timer);
+    touchDrag.item.classList.remove('dragging');
+    touchDrag.item.style.transform = '';
+    if (touchDrag.active) saveOrder();
+    touchDrag = null;
+  };
+  queue.addEventListener('touchend', endTouchDrag);
+  queue.addEventListener('touchcancel', endTouchDrag);
+}
+
+// Keep the file extension readable: when the name overflows, trim the middle
+// ("Long video na…clip.mp4") so both the start of the name and the format stay visible.
+function fitQueueNames() {
+  document.querySelectorAll('.qname').forEach(el => {
+    const full = el.dataset.full || (el.dataset.full = el.textContent);
+    el.textContent = full;
+    if (el.scrollWidth <= el.clientWidth) return;
+    const dot = full.lastIndexOf('.');
+    const stem = dot > 0 ? full.slice(0, dot) : full;
+    const ext = dot > 0 ? full.slice(dot) : '';
+    let keep = stem.length;
+    while (keep > 6) {
+      keep -= Math.max(1, Math.floor(keep / 8));
+      el.textContent = stem.slice(0, keep) + '…' + ext;
+      if (el.scrollWidth <= el.clientWidth) return;
+    }
+    // Even a short stem + extension doesn't fit — fall back to the CSS end cut.
+    el.textContent = full;
+  });
+}
+fitQueueNames();
+window.addEventListener('resize', fitQueueNames);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitQueueNames);  // re-measure after the webfont swaps in
+
+// --- Batch selection & delete (admins) ---
+const qselects = document.querySelectorAll('.qselect');
+if (qselects.length) {
+  const bar = document.getElementById('batchBar');
+  const count = document.getElementById('batchCount');
+  document.getElementById('batchDeleteBtn').addEventListener('click', async () => {
+    const ids = [...document.querySelectorAll('.qselect:checked')].map(cb => +cb.dataset.id);
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} selected file(s)? This cannot be undone.`)) return;
+    stopPreviewIfOpen();  // release file handles so Windows lets the server delete them
+    try {
+      const res = await fetch(`/videos/delete/${streamId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+        body: JSON.stringify({ ids })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      window.location.reload();
+    } catch (e) {
+      console.error('Batch delete failed', e);
+      showSettingsError('Failed to delete selected files');
+    }
+  });
+  const updateBar = () => {
+    const n = document.querySelectorAll('.qselect:checked').length;
+    bar.hidden = n === 0;
+    count.textContent = n + ' selected';
+  };
+  qselects.forEach(cb => cb.addEventListener('change', updateBar));
+}
+
+// --- Mini preview player (owner only) ---
+const previewDlg = document.getElementById('previewDlg');
+const openPreview = (btn) => {
+  if (!previewDlg) return;
+  const player = document.getElementById('previewPlayer');
+  document.getElementById('previewName').textContent = btn.dataset.name || '';
+  player.src = `/video/file/${btn.dataset.video}`;
+  previewDlg.showModal();
+  // Explicit play() inside the click handler carries user activation, so
+  // browsers allow sound; the autoplay attribute alone starts muted.
+  player.muted = false;
+  player.volume = 1;
+  player.play().catch(() => {
+    // Autoplay with sound rejected — start muted rather than not at all.
+    player.muted = true;
+    player.play().catch(() => {});
+  });
+};
+if (previewDlg) {
+  const player = document.getElementById('previewPlayer');
+  document.querySelectorAll('.qplay').forEach(btn => {
+    btn.addEventListener('click', () => openPreview(btn));
+  });
+  const stopPreview = () => { player.pause(); player.removeAttribute('src'); player.load(); };
+  document.getElementById('previewClose').addEventListener('click', () => previewDlg.close());
+  previewDlg.addEventListener('close', stopPreview);
+  // Per-row ✕ deletes submit through forms — release the file handle first
+  // (Windows can't delete a file while a player still holds it open).
+  window.stopPreviewIfOpen = () => { if (previewDlg.open) { stopPreview(); previewDlg.close(); } };
+  queue.addEventListener('submit', () => stopPreviewIfOpen(), true);
 }
 
 // --- Live polling: encode statuses + stream live state ---
@@ -158,22 +713,78 @@ async function poll() {
       const li = queue && queue.querySelector(`.qitem[data-id="${v.id}"]`);
       if (!li) return;
       const tag = li.querySelector('[data-status]');
-      if (tag && !tag.classList.contains(`st-${v.status}`)) {
-        tag.className = `status-tag st-${v.status}`;
-        tag.textContent = v.status.replace('_', ' ');
-        tag.title = v.error || '';
+      if (tag) {
+        if (v.status === 'completed') {
+          tag.hidden = true;  // no "completed" noise — only encode/error states
+        } else {
+          tag.hidden = false;
+          if (!tag.classList.contains(`st-${v.status}`)) {
+            tag.className = `status-tag st-${v.status}`;
+            tag.textContent = v.status.replace('_', ' ');
+            tag.title = v.error || '';
+          }
+        }
+      }
+
+      const resEl = li.querySelector('[data-res]');
+      if (resEl) {
+        resEl.textContent = v.res || '';
+        resEl.hidden = !v.res;
+      }
+      const sizeEl = li.querySelector('[data-size]');
+      if (sizeEl) {
+        sizeEl.textContent = v.size_label || '';
+        sizeEl.hidden = !v.size_label;
+      }
+
+      // Preview ▶ appears the moment the file is ready — no reload needed.
+      if (canManage) {
+        let play = li.querySelector('.qplay');
+        if (v.status === 'completed' && !play) {
+          play = document.createElement('button');
+          play.type = 'button';
+          play.className = 'qplay';
+          play.dataset.video = v.id;
+          const nameEl = li.querySelector('.qname');
+          play.dataset.name = nameEl ? nameEl.title : '';
+          play.title = 'Preview';
+          play.textContent = '▶';
+          play.addEventListener('click', () => openPreview(play));
+          li.querySelector('.qmeta').prepend(play);
+        } else if (play) {
+          play.hidden = v.status !== 'completed';
+        }
+      }
+
+      const progBar = li.querySelector('[data-qprogress]');
+      const progFill = li.querySelector('[data-qprogress-fill]');
+      if (progBar && progFill) {
+        progBar.hidden = v.status !== 'encoding';
+        if (v.status === 'encoding') {
+          progFill.style.width = (v.progress || 0) + '%';
+        }
       }
       const dur = li.querySelector('[data-dur]');
-      if (dur && v.duration && !dur.textContent) {
+      if (dur && v.duration) {
         const m = Math.floor(v.duration / 60), s = Math.floor(v.duration % 60);
         dur.textContent = `${m}:${String(s).padStart(2,'0')}`;
       }
     });
+    // Live pill + uptime timer
+    liveNow = !!ss.live;
+    liveBase = (liveNow && typeof ss.uptime === 'number')
+      ? Date.now() / 1000 - ss.uptime : null;
     const pill = document.getElementById('livePill');
     const txt = document.getElementById('liveText');
     if (pill) {
       pill.className = `pill ${ss.live ? 'pill-live' : 'pill-off'}`;
       txt.textContent = ss.live ? 'LIVE' : 'OFFLINE';
+    }
+
+    // Totals line above the queue (runtime + size)
+    const tot = document.getElementById('queueTotals');
+    if (tot && ss.totals) {
+      tot.textContent = [ss.totals.runtime, ss.totals.size].filter(Boolean).join(' · ');
     }
 
     // Now-playing highlight + progress bar

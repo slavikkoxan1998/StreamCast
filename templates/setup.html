@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Welcome — StreamCast{% endblock %}
+{% block body %}
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="brand"><span class="dot"></span>StreamCast</div>
+    <p class="subtitle">Welcome! Let's secure your panel.</p>
+    <p class="subtitle" style="font-weight:400; opacity:.75;">
+      This is the first start of StreamCast. Create an admin password for logging in —
+      it is stored locally in your database and never leaves your server.
+    </p>
+    <form method="post">
+      <div class="field">
+        <label for="password">Admin password</label>
+        <input type="password" id="password" name="password" required minlength="8"
+               autocomplete="new-password" autofocus>
+      </div>
+      <div class="field">
+        <label for="confirm">Repeat password</label>
+        <input type="password" id="confirm" name="confirm" required minlength="8"
+               autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+        Create password &amp; continue
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

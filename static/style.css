@@ -5,6 +5,7 @@
    ========================================================================= */
 
 :root {
+  color-scheme: light;
   --bg: #f4f6fb;
   --surface: #ffffff;
   --surface-2: #fbfcfe;
@@ -136,6 +137,8 @@ h2 { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 16px
   padding: 10px 17px;
   border-radius: var(--radius-sm);
   font-size: 14px; font-weight: 600;
+  font-family: inherit;
+  line-height: 1.5;
   cursor: pointer;
   transition: transform .15s var(--ease), box-shadow .15s var(--ease), background .15s var(--ease), border-color .15s var(--ease);
   text-decoration: none;
@@ -215,7 +218,8 @@ h2 { font-size: 17px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 16px
 .grid .stream-card:nth-child(n+6) { animation-delay: .24s; }
 .stream-card .name { font-weight: 700; font-size: 17px; margin-top: 14px; letter-spacing: -.01em; display:block; color: var(--text); }
 .stream-card .name:hover { color: var(--accent); }
-.stream-meta { color: var(--muted); font-size: 13px; display: flex; gap: 16px; margin-top: 12px; }
+.stream-meta { color: var(--muted); font-size: 13px; display: flex; gap: 6px 14px; margin-top: 12px; flex-wrap: wrap; align-items: baseline; }
+.stream-meta span { white-space: nowrap; }
 
 /* ---- Status pills ---- */
 .pill {
@@ -244,6 +248,7 @@ input[type=text], input[type=password], input[type=url], input[type=datetime-loc
   font-family: inherit;
   background: var(--surface-2);
   color: var(--text);
+  caret-color: var(--text);
   transition: border-color .15s var(--ease), box-shadow .15s var(--ease), background .15s var(--ease);
 }
 input::placeholder { color: #aab1bf; }
@@ -272,13 +277,20 @@ input:focus {
   animation: rise .4s var(--ease) both;
 }
 .qitem:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
-.qitem.dragging { opacity: .45; transform: scale(.99); }
+.qitem > form { margin: 0; display: flex; align-items: center; }
+.qitem.dragging { opacity: .45; transform: scale(.99); pointer-events: none; }
 .qitem.drag-over { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(59,91,253,.12); }
 .qhandle { cursor: grab; color: #c3c9d4; font-size: 18px; user-select: none; transition: color .15s var(--ease); }
 .qhandle:active { cursor: grabbing; }
 .qitem:hover .qhandle { color: var(--accent); }
 .qname { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qdur { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.qres {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .02em;
+  color: var(--accent); background: rgba(109,135,255,.10);
+  padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+}
+.qsize { color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* now-playing (on air) */
 .qitem.on-air {
@@ -346,6 +358,9 @@ input:focus {
 .flash-error { background: #fff0f2; color: #c31832; border: 1px solid #ffc9d2; }
 
 .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+/* Neutralize the UA stylesheet's form margin (1em) that breaks vertical
+   centering when forms and links share a flex row. */
+.row > form { margin: 0; display: flex; align-items: center; }
 .spacer { flex: 1; }
 .muted { color: var(--muted); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; letter-spacing: -.01em; }
@@ -367,3 +382,372 @@ input:focus {
 }
 .login-card .brand { justify-content: center; margin-bottom: 6px; font-size: 24px; }
 .login-card .subtitle { text-align: center; }
+
+/* =========================================================================
+   Dark theme — deep space blue with soft glow accents
+   ========================================================================= */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0e15;
+  --surface: #141824;
+  --surface-2: #1a2030;
+  --border: #242c40;
+  --border-strong: #303a54;
+  --text: #e9edf6;
+  --text-2: #c5cddd;
+  --muted: #8b95ab;
+  --accent: #6d87ff;
+  --accent-2: #8fa4ff;
+  --accent-hover: #8fa4ff;
+  --live: #ff4d64;
+  --ok: #2dd4a0;
+  --warn: #fbbf24;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.30), 0 2px 6px rgba(0,0,0,.25);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.35), 0 12px 28px rgba(0,0,0,.35);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.40), 0 24px 56px rgba(0,0,0,.45);
+}
+
+/* Aurora blooms tuned for dark: dimmer, more glow-like */
+html[data-theme="dark"] body::before {
+  background:
+    radial-gradient(38vmax 38vmax at 12% 8%, rgba(109,135,255,.14), transparent 60%),
+    radial-gradient(32vmax 32vmax at 88% 12%, rgba(93,115,255,.09), transparent 62%),
+    radial-gradient(40vmax 40vmax at 78% 92%, rgba(45,212,160,.06), transparent 60%),
+    radial-gradient(30vmax 30vmax at 20% 96%, rgba(255,77,100,.05), transparent 60%);
+}
+
+html[data-theme="dark"] .topbar {
+  background: rgba(15,19,30,.75);
+  border-bottom-color: rgba(36,44,64,.9);
+}
+html[data-theme="dark"] input::placeholder { color: #5c677e; }
+html[data-theme="dark"] input:focus { background: var(--surface); }
+html[data-theme="dark"] .btn:hover { border-color: var(--accent); }
+html[data-theme="dark"] .btn-danger:hover { background: rgba(255,77,100,.10); border-color: rgba(255,77,100,.35); }
+html[data-theme="dark"] .pill-live { background: rgba(255,77,100,.12); box-shadow: inset 0 0 0 1px rgba(255,77,100,.22); }
+html[data-theme="dark"] .pill-off { background: rgba(255,255,255,.06); }
+html[data-theme="dark"] .pill-off .pdot { background: #5a6479; }
+html[data-theme="dark"] .qhandle { color: #49536a; }
+html[data-theme="dark"] .qitem.on-air {
+  background: linear-gradient(180deg, rgba(109,135,255,.15), rgba(109,135,255,.06));
+}
+html[data-theme="dark"] .st-waiting_encode { background: rgba(255,255,255,.07); }
+html[data-theme="dark"] .st-encoding {
+  background: linear-gradient(90deg, rgba(109,135,255,.14), rgba(109,135,255,.30), rgba(109,135,255,.14));
+  background-size: 200% 100%;
+  color: var(--accent-2);
+}
+html[data-theme="dark"] .st-completed { background: rgba(45,212,160,.13); }
+html[data-theme="dark"] .st-error { background: rgba(255,77,100,.13); }
+html[data-theme="dark"] .flash-ok { background: rgba(45,212,160,.12); color: #55e6bb; border-color: rgba(45,212,160,.32); }
+html[data-theme="dark"] .flash-error { background: rgba(255,77,100,.12); color: #ff8b9c; border-color: rgba(255,77,100,.32); }
+html[data-theme="dark"] .dropzone:hover,
+html[data-theme="dark"] .dropzone.hover { background: rgba(109,135,255,.10); }
+html[data-theme="dark"] .login-card {
+  background: rgba(17,21,33,.85);
+  border-color: rgba(255,255,255,.08);
+}
+
+/* ---- Theme toggle button (topbar, leftmost of the right-side group) ---- */
+.topbar nav { display: flex; align-items: center; }
+.theme-toggle {
+  width: 38px; height: 38px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  transition: transform .25s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease), background .15s var(--ease);
+}
+.theme-toggle:hover {
+  transform: rotate(18deg) scale(1.08);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+.topbar nav .theme-toggle { margin-left: 0; margin-right: 22px; }
+
+/* ---- iOS-style live switch on dashboard tiles ---- */
+.live-switch {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  width: 44px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--border-strong);
+  position: relative;
+  padding: 0;
+  flex: none;
+  transition: background .2s var(--ease);
+}
+.live-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  transition: left .2s var(--ease);
+}
+.live-switch:hover { filter: brightness(.95); }
+.live-switch.on { background: #34c759; }
+.live-switch.on::after { left: 21px; }
+
+/* Max-quality mode badge: amber instead of the regular blue */
+.qres-max {
+  color: #a16207;
+  background: rgba(245, 158, 11, .14);
+}
+html[data-theme="dark"] .qres-max {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, .12);
+}
+
+/* Corner toasts → centered toasts (same compact style, all screens) */
+.toast-stack {
+  position: fixed;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: min(340px, calc(100vw - 24px));
+  box-shadow: var(--shadow-lg);
+  animation: rise .3s var(--ease) both;
+}
+.toast-ok { background: #e7faf2; color: #0a7f5b; border: 1px solid #a9ecd2; }
+.toast-error { background: #fff0f2; color: #c31832; border: 1px solid #ffc9d2; }
+html[data-theme="dark"] .toast-ok { background: rgba(45,212,160,.12); color: #55e6bb; border-color: rgba(45,212,160,.32); }
+html[data-theme="dark"] .toast-error { background: rgba(255,77,100,.12); color: #ff8b9c; border-color: rgba(255,77,100,.32); }
+
+/* YouTube-style tile thumbnail between status row and name */
+.tile-thumb {
+  margin-top: 12px;
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--surface);
+}
+.tile-thumb.hide { display: none; }
+.tile-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Admin panel inputs (role / note / password fields) */
+.admin-input {
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  caret-color: var(--text);
+  font: inherit;
+  outline: none;
+  min-width: 0;
+}
+.admin-input:focus { border-color: var(--accent); }
+
+/* ---- Topbar icon buttons & dropdown menu (all screens) ---- */
+.topbar nav { gap: 10px; }
+.topbar nav .theme-toggle { margin-right: 0; }
+/* Icon links (logout) sit in the flex row: kill the legacy margin-left so the
+   gap to the burger is the same 10px as between the buttons. */
+.topbar nav .topbar-icon { margin-left: 0; }
+.topbar-icon {
+  width: 38px; height: 38px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer; padding: 0; line-height: 1; font-size: 17px;
+  transition: border-color .15s var(--ease), color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.topbar-icon:hover { color: var(--text); border-color: var(--accent); box-shadow: var(--shadow-sm); }
+.topbar-icon svg { display: block; }
+.topbar-menu {
+  position: fixed; top: 72px; right: 18px; z-index: 1200;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  padding: 6px; min-width: 210px;
+  display: flex; flex-direction: column;
+  animation: rise .25s var(--ease) both;
+}
+.topbar-menu a { padding: 11px 14px; border-radius: 9px; color: var(--text); font-weight: 600; font-size: 14px; text-decoration: none; }
+.topbar-menu a:hover { background: rgba(109,135,255,.10); color: var(--accent); }
+html[data-theme="dark"] .topbar-menu { background: #151926; border-color: rgba(255,255,255,.10); }
+
+/* ---- Queue item: name block + badges row ---- */
+.qmain { flex: 1; min-width: 0; }
+.qmeta { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+
+/* ---- Mobile layout ---- */
+@media (max-width: 640px) {
+  .topbar { padding: 0 14px; }
+  .topbar-menu { right: 12px; }
+  .container { padding: 22px 14px 64px; }
+  h1 { font-size: 22px; }
+  .page-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-head .btn { justify-content: center; }
+  #stream-search { min-width: 0 !important; width: 100% !important; }
+  .grid { grid-template-columns: 1fr; gap: 14px; }
+  .stream-card { padding: 14px; }
+  .stream-card .row { gap: 6px 10px; }
+}
+.topbar-menu[hidden] { display: none; }
+/* Queue name truncates inside the qmain/qmeta layout */
+.qname { display: block; }
+
+/* ---- Queue item: name block + badges row ---- */
+.qmain { flex: 1; min-width: 0; }
+.qmeta { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+.qmeta form { margin: 0; display: flex; align-items: center; }
+/* Name + ▲▼ row wrapper: transparent on desktop, real row on phones */
+.qrow-top { display: contents; }
+
+/* ---- Admin panel: per-account actions + master password form ---- */
+.user-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; flex: none; flex-wrap: nowrap; }
+.user-actions form { margin: 0; display: flex; }
+.admin-pass-form { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.admin-pass-form .btn { justify-content: center; margin-top: 4px; }
+
+/* ---- Stream page actions: Edit + Stop/Go live on one line, Apply below ---- */
+.page-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-left: auto; }
+.page-actions .pa-row { display: flex; align-items: center; gap: 8px; }
+.page-actions form { margin: 0; }
+.page-actions .pa-apply { width: 100%; }
+.page-actions .pa-apply .btn { width: 100%; justify-content: center; }
+
+/* ---- Dashboard disk usage strip ---- */
+.disk-strip { display: flex; align-items: center; gap: 10px; margin: 18px 0 4px; }
+.disk-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.disk-bar-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  transition: width .4s var(--ease);
+}
+.disk-bar-fill.warn { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.disk-bar-fill.low { background: linear-gradient(90deg, #ff5a70, var(--live)); }
+.disk-label { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.encode-chip {
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  background: rgba(109,135,255,.10); padding: 3px 10px;
+  border-radius: 999px; white-space: nowrap;
+}
+
+/* ---- iOS-style toggle switch (shuffle, video sound, thumbnails) ---- */
+.switch { position: relative; display: inline-block; width: 34px; height: 20px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--border-strong); transition: .4s; border-radius: 34px;
+}
+.slider:before {
+  position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+  background-color: white; transition: .4s; border-radius: 50%;
+}
+input:checked + .slider { background-color: var(--accent, #007bff); }
+input:checked + .slider:before { transform: translateX(14px); }
+
+/* Thumbnails toggle: when off, drop the preview blocks and collapse the tiles */
+.thumb-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+  cursor: pointer; user-select: none; white-space: nowrap;
+}
+.no-thumbs .tile-thumb { display: none; }
+.no-thumbs .stream-card .name { margin-top: 0; }
+
+/* ---- Batch select & mini preview (queue) ---- */
+.qselect { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex: none; }
+.batch-bar { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+.qplay {
+  width: 26px; height: 26px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  background: var(--surface); color: var(--accent); cursor: pointer; padding: 0; font-size: 11px;
+  transition: border-color .15s var(--ease), color .15s var(--ease);
+}
+.qplay:hover { border-color: var(--accent); }
+.qplay[hidden] { display: none; }
+.preview-dlg {
+  border: 1px solid var(--border-strong); border-radius: 14px;
+  padding: 14px; background: var(--surface); color: var(--text);
+  max-width: min(720px, 92vw);
+}
+.preview-dlg::backdrop { background: rgba(0,0,0,.55); }
+.preview-dlg video { width: 100%; max-height: 60vh; border-radius: 8px; background: #000; }
+.preview-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.preview-foot span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- Queue card header + control rows ---- */
+.qhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.qhead h2 { margin: 0; }
+.qhead-side { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted, #666); }
+.qhint { display: block; font-size: 13px; margin: 0 0 10px; }
+.qnote { margin: 0 0 10px; }
+.qvol-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin: 0 0 8px; font-size: 13px; color: var(--muted, #666); }
+.qtot-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; margin: 0 0 16px; font-size: 13px; }
+.qtot-row.qtot-right { justify-content: flex-end; }
+
+/* ---- Mobile: stream header + queue rows ---- */
+@media (max-width: 640px) {
+  .card { padding: 16px; }
+
+  /* Stream page: action block stays top-right, next to name/status */
+  .page-head.stream-head { flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 10px; }
+
+  /* ON AIR tag pinned to the left edge of the badges line */
+  .qmeta .nowtag { margin-right: auto; }
+
+  /* YouTube link on tiles: own line, centered (phones only) */
+  .stream-meta .yt-link { flex-basis: 100%; text-align: center; margin-top: 2px; }
+
+  /* Queue rows: name + ▲▼ share one centered line, badges line under it */
+  .qitem {
+    flex-wrap: wrap; gap: 7px 8px; padding: 6px 12px;
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+  }
+  .qitem .qhandle { display: none; }  /* drag dots unused on phones — ▲▼ buttons instead */
+  .qrow-top { display: flex; align-items: center; gap: 8px; flex-basis: 100%; min-width: 0; max-width: 100%; }
+  /* flex-basis 0 + overflow:hidden so long nowrap names can never push the badges away */
+  .qmain { flex: 1 1 0; min-width: 0; overflow: hidden; }
+  .qname { font-size: 13.5px; }
+  .qmeta {
+    flex-basis: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 7px;
+    overflow: hidden;
+  }
+  /* Delete ✕ sized like the ▲▼ buttons so the badges line stays slim */
+  .qmeta .btn-danger.btn-sm {
+    width: 26px; height: 26px; min-width: 0; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+}

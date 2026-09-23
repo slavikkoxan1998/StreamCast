@@ -7,3 +7,5 @@ venv/
 *.db
 *.db-wal
 *.db-shm
+.zcode/
+.claude/

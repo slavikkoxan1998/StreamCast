@@ -4,29 +4,125 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}StreamCast{% endblock %}</title>
+  <script>
+    // Apply the saved theme before first paint to avoid a light flash.
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('sc-theme'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') {
+        t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+
+    function truncateMiddle(str, maxLen = 30) {
+      if (!str || str.length <= maxLen) return str;
+      const dot = "...";
+      const extIdx = str.lastIndexOf('.');
+      if (extIdx === -1) return str.slice(0, maxLen - 3) + dot;
+      const ext = str.slice(extIdx);
+      const name = str.slice(0, extIdx);
+      if (name.length <= maxLen - ext.length) return str;
+      return name.slice(0, Math.floor((maxLen - ext.length - 3) / 2)) + dot + name.slice(-(Math.ceil((maxLen - ext.length - 3) / 2))) + ext;
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=25">
 </head>
 <body>
-  {% if session.get('authed') %}
   <div class="topbar">
     <a href="{{ url_for('dashboard') }}" class="brand"><span class="dot"></span>StreamCast</a>
     <nav>
-      <a href="{{ url_for('dashboard') }}">Streams</a>
-      <a href="{{ url_for('logout') }}">Log out</a>
+      <button type="button" id="themeToggle" class="theme-toggle" title="Toggle dark theme" aria-label="Toggle dark theme">🌙</button>
+      <button type="button" id="menuToggle" class="topbar-icon" title="Menu" aria-label="Menu" aria-expanded="false" aria-controls="topbarMenu">☰</button>
+      {% if session.get('authed') %}
+      <a href="{{ url_for('logout') }}" class="topbar-icon" title="Log out" aria-label="Log out">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </a>
+      {% endif %}
     </nav>
   </div>
-  {% endif %}
+  <div class="topbar-menu" id="topbarMenu" hidden>
+    <a href="{{ url_for('dashboard') }}">Streams</a>
+    {% if u_role == 'admin' %}<a href="{{ url_for('admin_panel') }}">Admin panel</a>{% endif %}
+    {% if session.get('authed') %}<a href="{{ url_for('change_password') }}">Change password</a>
+    {% else %}<a href="{{ url_for('login') }}">Log in</a>{% endif %}
+  </div>
   <div class="container">
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for cat, msg in messages %}
-        <div class="flash flash-{{ 'error' if cat == 'error' else 'ok' }}">{{ msg }}</div>
-      {% endfor %}
+      {% if messages %}
+      <div class="toast-stack">
+        {% for cat, msg in messages %}
+          <div class="toast toast-{{ 'error' if cat == 'error' else 'ok' }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
     {% endwith %}
     {% block body %}{% endblock %}
   </div>
+  <script>
+    // Server-rendered toasts: click to dismiss, auto-hide after a pause.
+    document.querySelectorAll('.toast-stack .toast').forEach(function (t) {
+      t.addEventListener('click', function () { t.remove(); });
+      setTimeout(function () { t.remove(); },
+        t.classList.contains('toast-error') ? 6000 : 3500);
+    });
+  </script>
   {% block scripts %}{% endblock %}
+  <script>
+    // Theme toggle: top-right, persisted per browser.
+    (function () {
+      var btn = document.getElementById('themeToggle');
+      if (!btn) return;
+      var root = document.documentElement;
+      var setIcon = function () {
+        btn.textContent = root.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+      };
+      setIcon();
+      btn.addEventListener('click', function () {
+        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        try { localStorage.setItem('sc-theme', next); } catch (e) {}
+        setIcon();
+      });
+    })();
+
+    // Topbar dropdown menu: toggle on burger, close on outside click / Esc / link.
+    (function () {
+      var btn = document.getElementById('menuToggle');
+      var menu = document.getElementById('topbarMenu');
+      if (!btn || !menu) return;
+      var setOpen = function (open) {
+        menu.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        setOpen(menu.hidden);
+      });
+      document.addEventListener('click', function (e) {
+        if (!menu.hidden && !menu.contains(e.target) && e.target !== btn) setOpen(false);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') setOpen(false);
+      });
+      menu.addEventListener('click', function (e) {
+        if (e.target.closest('a')) setOpen(false);
+      });
+    })();
+
+    function truncateMiddle(str, maxLen = 30) {
+      if (!str || str.length <= maxLen) return str;
+      const dot = "...";
+      const extIdx = str.lastIndexOf('.');
+      if (extIdx === -1) return str.slice(0, maxLen - 3) + dot;
+      const ext = str.slice(extIdx);
+      const name = str.slice(0, extIdx);
+      if (name.length <= maxLen - ext.length) return str;
+      return name.slice(0, Math.floor((maxLen - ext.length - 3) / 2)) + dot + name.slice(-(Math.ceil((maxLen - ext.length - 3) / 2))) + ext;
+    }
+  </script>
 </body>
 </html>
